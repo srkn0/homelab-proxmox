@@ -1,0 +1,67 @@
+#!/bin/sh
+
+set -e
+
+# empty message of the day.
+echo -n > /etc/motd
+
+# remove some unused packages
+DEBIAN_FRONTEND=noninteractive apt-get purge -y laptop-detect tasksel emacsen-common ienglish-common ispell
+
+# install some additional packages
+DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends linux-headers-amd64 openssh-server openssl zip unzip curl net-tools strace lsof less screen rsync bash-completion socat psmisc man-db dnsutils jq bash acl rsyslog chrony vim
+
+# configure chrony
+cat > /etc/chrony/chrony.conf <<EOF
+pool de.pool.ntp.org iburst
+driftfile /var/lib/chrony/chrony.drift
+makestep 1.0 3
+rtcsync
+EOF
+
+# disable systemd-timesyncd
+systemctl stop systemd-timesyncd
+systemctl disable systemd-timesyncd
+
+# enable and start chrony
+systemctl enable chrony
+systemctl start chrony
+
+# unpack the postinstall tar file
+tar -z -x -C /tmp -f /tmp/postinstall.tar.gz
+
+# install global things and root things
+mkdir -m700 -p /root/.ssh
+cp /tmp/postinstall.d/vimrc /root/.vimrc
+cp /tmp/postinstall.d/bash_login /root/.bash_login
+
+# install ssh keys for root
+cp /tmp/postinstall.d/authorized_keys /root/.ssh/authorized_keys
+chown root:root /root/.ssh
+chmod 600 /root/.ssh/authorized_keys
+
+# fix permissions on root home directory
+chmod 700 /root
+chmod 600 /root/.bash_login
+
+# configure network interfaces with vmbr0 for proxmox
+cat > /etc/network/interfaces <<EOF
+auto lo
+iface lo inet loopback
+
+allow-hotplug ens33
+iface ens33 inet manual
+
+auto vmbr0
+iface vmbr0 inet static
+    address 192.168.178.90/24
+    gateway 192.168.178.1
+    netmask 255.255.255.0
+    dns-nameservers 1.1.1.1 1.0.0.1
+    bridge-ports ens33
+    bridge-stp off
+    bridge-fd 0
+EOF
+
+# clean up
+rm -rf /tmp/postinstall.d
