@@ -1,0 +1,20 @@
+# External Ansible roles (installed via:
+#   ansible-galaxy install -r requirements.yml -p ./roles)
+/roles/lae.proxmox/
+/roles/mrlesmithjr.zfs/
+
+# Ansible runtime artifacts (collections/roles pulled in locally, e.g. by ansible-lint)
+.ansible/
+*.retry
+
+# Cluster credentials & kubeconfigs (never commit these)
+kubeconfig
+**/credentials/
+
+# Generated preseed ISOs
+*.iso
+
+# Editor / OS noise
+.DS_Store
+.idea/
+.vscode/
