@@ -1,0 +1,73 @@
+---
+- name: Install and configure Proxmox VE
+  hosts: all
+  become: true
+  roles:
+    - role: lae.proxmox
+      vars:
+        # ------------------------
+        # general
+        pve_group: all
+        pve_cluster_enabled: false
+
+        # ------------------------
+        # zfs
+        pve_zfs_enabled: true
+        pve_zfs_zed_email: "xsrkncs@gmail.com"
+        pve_zfs_create_volumes: [] # managed via setup_zfs.yml playbook
+        # proxmox storage definitions
+        pve_storages:
+          - name: backup
+            type: dir
+            path: /mnt/zpool_backup
+            content: ["backup"]
+          - name: k8s
+            type: dir
+            path: /mnt/zpool_k8s
+            content: ["images", "rootdir"]
+          - name: vms
+            type: dir
+            path: /mnt/zpool_nvme
+            content: ["images", "rootdir", "vztmpl", "iso", "snippets"]
+        # arc_max: 16GiB
+        # arc_min: 1GiB
+        # arc_meta_limit: 2GiB
+        # byte -> gibibyte
+        pve_zfs_options: "zfs_arc_max=17179869184 zfs_arc_meta_limit=2147483648 zfs_arc_min=1073741824 zfs_prefetch_disable=1 zfs_txg_timeout=5"
+
+
+        # ------------------------
+        # gpu passthrough
+        pve_pcie_passthrough_enabled: true # Set this to true to enable PCIe passthrough.
+        pve_iommu_passthrough_mode: true # Set this to true to allow VMs to bypass the DMA translation. This might increase performance for IOMMU passthrough.
+        pve_iommu_unsafe_interrupts: false # Set this to true if your system doesn't support interrupt remapping.
+        pve_mediated_devices_enabled: false # Set this to true if your device supports gtv-g and you wish to enable split functionality.
+        pve_pcie_ovmf_enabled: true # Set this to true to enable GPU OVMF PCI passthrough.
+        pve_pci_device_ids: # List of pci device ID's (see https://pve.proxmox.com/wiki/Pci_passthrough#GPU_Passthrough).
+          # lspci -nn
+          - id: "10de:2487"
+        pve_vfio_blacklist_drivers: # List of device drivers to blacklist from the Proxmox host (see https://pve.proxmox.com/wiki/PCI(e)_Passthrough).
+          - name: "radeon"
+          - name: "nouveau"
+          - name: "nvidia"
+
+        # ------------------------
+        # other options
+        # pve_ssl_private_key: "" # Should be set to the contents of the private key to use for HTTPS
+        # pve_ssl_certificate: "" # Should be set to the contents of the certificate to use for HTTPS
+        # pve_roles: [] # Added more roles with specific privileges. See section on User Management.
+        # pve_groups: [] # List of group definitions to manage in PVE. See section on User Management.
+        pve_users: # List of user definitions to manage in PVE. See section on User Management.
+          - name: k8s-mgmt@pve
+            firstname: Kubernetes
+            lastname: Management
+            email: xsrkncs+pve-k8s-mgmt@gmail.com
+            groups: []
+        pve_acls:
+          - path: /
+            roles: ["PVEAdmin"]
+            users:
+              - k8s-mgmt@pve
+        # pve_metric_servers: [] # List of metric servers to configure in PVE.
+        # pve_datacenter_cfg: {} # Dictionary to configure the PVE datacenter.cfg config file.
+        # pve_no_log: false # Set this to true in production to prevent leaking of storage credentials in run logs. (may be used in other tasks in the future)
