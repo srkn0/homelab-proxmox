@@ -1,0 +1,24 @@
+---
+- name: Create the development VM from the cloud-init template
+  hosts: all
+  become: true
+  roles:
+    - role: proxmox_vm
+      vars:
+        vm_template_vmid: 8202  # dev template
+        vm_nameserver: "1.1.1.1"
+        vm_gateway: "192.168.178.1"
+        vm_user: "root"
+
+        proxmox_vms:
+          - vmid: 10001
+            name: "dev"
+            memory: 16384
+            cores: 6
+            disk_size: "100G"
+            ip: "192.168.178.216"
+            cidr: 24
+            tags:
+              - kubernetes
+              - openclaw
+              - dev

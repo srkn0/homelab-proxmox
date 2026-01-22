@@ -1,0 +1,85 @@
+---
+- name: Set VM variables
+  ansible.builtin.set_fact:
+    _vmid: "{{ vm.vmid }}"
+    _name: "{{ vm.name }}"
+    _template_vmid: "{{ vm.template_vmid | default(vm_template_vmid) }}"
+    _memory: "{{ vm.memory | default(vm_memory) }}"
+    _cores: "{{ vm.cores | default(vm_cores) }}"
+    _disk_size: "{{ vm.disk_size | default(vm_disk_size) }}"
+    _bridge: "{{ vm.bridge | default(vm_bridge) }}"
+    _ip: "{{ vm.ip | default(vm_ip) }}"
+    _cidr: "{{ vm.cidr | default(vm_cidr) }}"
+    _gateway: "{{ vm.gateway | default(vm_gateway) }}"
+    _nameserver: "{{ vm.nameserver | default(vm_nameserver) }}"
+    _user: "{{ vm.user | default(vm_user) }}"
+    _ssh_keys_file: "{{ vm.ssh_keys_file | default(vm_ssh_keys_file) }}"
+    _start_after_create: "{{ vm.start_after_create | default(vm_start_after_create) }}"
+    _tags: "{{ vm.tags | default([]) | join(',') }}"
+
+- name: Check if VM already exists
+  ansible.builtin.command: qm status {{ _vmid }}
+  register: _vm_exists
+  failed_when: false
+  changed_when: false
+
+- name: Skip message for existing VM
+  ansible.builtin.debug:
+    msg: "VM {{ _name }} (VMID {{ _vmid }}) already exists, skipping"
+  when: _vm_exists.rc == 0
+
+- name: Create VM from template
+  when: _vm_exists.rc != 0
+  block:
+    - name: Clone template to new VM
+      ansible.builtin.command: >
+        qm clone {{ _template_vmid }} {{ _vmid }}
+        --name "{{ _name }}"
+        --full
+      changed_when: true
+
+    - name: Configure VM memory and cores
+      ansible.builtin.command: >
+        qm set {{ _vmid }}
+        --memory {{ _memory }}
+        --cores {{ _cores }}
+      changed_when: true
+
+    - name: Resize VM disk
+      ansible.builtin.command: qm resize {{ _vmid }} scsi0 {{ _disk_size }}
+      changed_when: true
+
+    - name: Set cloud-init IP config (DHCP)
+      ansible.builtin.command: qm set {{ _vmid }} --ipconfig0 ip=dhcp,ip6=dhcp
+      changed_when: true
+      when: _ip == "dhcp"
+
+    - name: Set cloud-init IP config (static)
+      ansible.builtin.command: >
+        qm set {{ _vmid }}
+        --ipconfig0 ip={{ _ip }}/{{ _cidr }},gw={{ _gateway }}
+      changed_when: true
+      when: _ip != "dhcp"
+
+    - name: Set cloud-init nameserver
+      ansible.builtin.command: qm set {{ _vmid }} --nameserver {{ _nameserver }}
+      changed_when: true
+      when: _nameserver != ""
+
+    - name: Set cloud-init user
+      ansible.builtin.command: qm set {{ _vmid }} --ciuser {{ _user }}
+      changed_when: true
+
+    - name: Set cloud-init SSH keys
+      ansible.builtin.command: qm set {{ _vmid }} --sshkeys {{ _ssh_keys_file }}
+      changed_when: true
+
+    - name: Set VM tags
+      ansible.builtin.command: qm set {{ _vmid }} --tags {{ _tags }}
+      changed_when: true
+      when: _tags != ""
+
+    - name: Start VM
+      ansible.builtin.command: qm start {{ _vmid }}
+      changed_when: true
+      when: _start_after_create | bool

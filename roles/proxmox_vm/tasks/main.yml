@@ -1,0 +1,6 @@
+---
+- name: Create VMs from cloud-init templates
+  ansible.builtin.include_tasks: create_vm.yml
+  loop: "{{ proxmox_vms }}"
+  loop_control:
+    loop_var: vm
