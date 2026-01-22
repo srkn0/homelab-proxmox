@@ -1,0 +1,37 @@
+---
+# Default template to clone
+vm_template_vmid: 8200
+
+# Default VM settings
+vm_memory: 2048
+vm_cores: 2
+vm_disk_size: "20G"
+vm_bridge: "vmbr0"
+
+# Default cloud-init network settings
+vm_ip: "dhcp"
+vm_cidr: 24
+vm_gateway: ""
+vm_nameserver: ""
+
+# Default cloud-init user settings
+vm_user: "{{ ansible_user }}"
+vm_ssh_keys_file: "~/.ssh/authorized_keys"
+
+# Start VM after creation
+vm_start_after_create: true
+
+# List of VMs to create
+# Example:
+# proxmox_vms:
+#   - vmid: 100
+#     name: "k8s-master-01"
+#     memory: 4096
+#     cores: 4
+#     disk_size: "50G"
+#     ip: "192.168.178.100"
+#     cidr: 24
+#     tags:
+#       - kubernetes
+#       - master
+proxmox_vms: []
