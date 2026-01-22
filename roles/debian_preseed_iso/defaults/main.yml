@@ -1,0 +1,58 @@
+---
+# =============================================================================
+# Required
+# =============================================================================
+# Absolute path to the source Debian netinst ISO that gets remastered.
+# Download from https://www.debian.org/distrib/netinst
+preseed_input_iso: ""
+
+# =============================================================================
+# Output
+# =============================================================================
+# Absolute path where the generated, preseeded ISO is written.
+preseed_output_iso: "{{ playbook_dir }}/preseed-debian-amd64-netinst.iso"
+
+# =============================================================================
+# Localization
+# =============================================================================
+preseed_locale: "de_DE.UTF-8"
+preseed_keymap: "de"
+preseed_timezone: "UTC"
+preseed_mirror_country: "DE"
+preseed_mirror_hostname: "deb.debian.org"
+preseed_ntp_server: "de.pool.ntp.org"
+
+# =============================================================================
+# Installer networking (static config applied during the Debian install)
+# =============================================================================
+preseed_install_interface: "enp4s0"
+preseed_nameservers: "1.1.1.1 1.0.0.1"
+
+# =============================================================================
+# Root account
+# =============================================================================
+# NOTE: reference value only. For real builds set a strong password (or a
+# pre-hashed value via `mkpasswd`) or rely solely on the SSH keys below.
+preseed_root_password: "123"
+
+# Public SSH key(s) installed into /root/.ssh/authorized_keys on the target.
+preseed_authorized_keys: |
+  ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJQdvqS8ddf4N80JR9wKFHoUY61JeuAnOFCFVrNVxrDw serkan@DESKTOP-1D6KOOI
+
+# =============================================================================
+# Post-install network bridge (Proxmox vmbr0)
+# Configured by the postinstall script so the host comes up ready for Proxmox.
+# =============================================================================
+preseed_bridge_port: "ens33"
+preseed_bridge_address: "192.168.178.90/24"
+preseed_bridge_gateway: "192.168.178.1"
+preseed_bridge_netmask: "255.255.255.0"
+preseed_bridge_nameservers: "1.1.1.1 1.0.0.1"
+
+# =============================================================================
+# Build host packages required to remaster the ISO
+# =============================================================================
+preseed_build_packages:
+  - xorriso
+  - isolinux
+  - pwgen

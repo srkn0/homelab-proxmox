@@ -1,0 +1,19 @@
+---
+# Build a preseeded Debian netinst ISO for bootstrapping the Proxmox node(s).
+#
+# Usage:
+#   ansible-playbook playbooks/build_preseed_iso.yml \
+#     -e input_iso=/path/to/debian-13.x.x-amd64-netinst.iso \
+#     -e output_iso=/path/to/preseed-debian-13.x.x-amd64-netinst.iso
+#
+# Runs locally on a Debian build host (needs apt to install xorriso/isolinux/pwgen).
+- name: Build preseeded Debian installer ISO
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  roles:
+    - role: debian_preseed_iso
+      vars:
+        preseed_input_iso: "{{ input_iso | default('') }}"
+        preseed_output_iso: >-
+          {{ output_iso | default(playbook_dir + '/preseed-debian-amd64-netinst.iso') }}

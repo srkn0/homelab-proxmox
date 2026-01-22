@@ -1,0 +1,82 @@
+---
+- name: Assert that a source ISO was provided
+  ansible.builtin.assert:
+    that:
+      - preseed_input_iso | length > 0
+    fail_msg: >-
+      'preseed_input_iso' must be set to the path of a Debian netinst ISO.
+      Download one from https://www.debian.org/distrib/netinst
+
+- name: Check that the source ISO exists
+  ansible.builtin.stat:
+    path: "{{ preseed_input_iso }}"
+  register: _preseed_source_iso
+
+- name: Fail when the source ISO is missing
+  ansible.builtin.assert:
+    that:
+      - _preseed_source_iso.stat.exists
+    fail_msg: "Source ISO not found at '{{ preseed_input_iso }}'."
+
+- name: Install ISO build dependencies
+  become: true
+  ansible.builtin.apt:
+    name: "{{ preseed_build_packages }}"
+    state: present
+    update_cache: true
+    install_recommends: false
+  when: ansible_os_family == "Debian"
+
+- name: Create a temporary build directory
+  ansible.builtin.tempfile:
+    state: directory
+    suffix: preseed-build
+  register: _preseed_workdir
+
+- name: Assemble the build workspace
+  block:
+    - name: Copy the build script
+      ansible.builtin.copy:
+        src: build
+        dest: "{{ _preseed_workdir.path }}/build"
+        mode: "0755"
+
+    - name: Copy the static postinstall.d assets
+      ansible.builtin.copy:
+        src: postinstall.d/
+        dest: "{{ _preseed_workdir.path }}/postinstall.d/"
+        mode: "0644"
+
+    - name: Render the authorized_keys file
+      ansible.builtin.template:
+        src: authorized_keys.j2
+        dest: "{{ _preseed_workdir.path }}/postinstall.d/authorized_keys"
+        mode: "0644"
+
+    - name: Render the preseed config
+      ansible.builtin.template:
+        src: preseed.cfg.j2
+        dest: "{{ _preseed_workdir.path }}/preseed.cfg"
+        mode: "0644"
+
+    - name: Render the postinstall script
+      ansible.builtin.template:
+        src: postinstall.j2
+        dest: "{{ _preseed_workdir.path }}/postinstall"
+        mode: "0755"
+
+    - name: Build the preseeded ISO
+      ansible.builtin.command:
+        cmd: ./build {{ preseed_input_iso | quote }} {{ preseed_output_iso | quote }}
+        chdir: "{{ _preseed_workdir.path }}"
+        creates: "{{ preseed_output_iso }}"
+
+    - name: Report the generated ISO path
+      ansible.builtin.debug:
+        msg: "Preseeded ISO written to {{ preseed_output_iso }}"
+
+  always:
+    - name: Remove the temporary build directory
+      ansible.builtin.file:
+        path: "{{ _preseed_workdir.path }}"
+        state: absent
