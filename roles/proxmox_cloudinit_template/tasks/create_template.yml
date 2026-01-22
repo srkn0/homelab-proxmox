@@ -1,0 +1,148 @@
+---
+- name: Set template variables
+  ansible.builtin.set_fact:
+    _vmid: "{{ template.vmid }}"
+    _name: "{{ template.name }}"
+    _image_url: "{{ template.image_url }}"
+    _image_filename: "{{ template.image_url | basename }}"
+    _checksum_url: "{{ template.checksum_url }}"
+    _storage: "{{ template.storage | default(cloudinit_storage) }}"
+    _storage_path: "{{ template.storage_path | default(cloudinit_storage_path) }}"
+    _memory: "{{ template.memory | default(cloudinit_memory) }}"
+    _cores: "{{ template.cores | default(cloudinit_cores) }}"
+    _sockets: "{{ template.sockets | default(cloudinit_sockets) }}"
+    _disk_size: "{{ template.disk_size | default(cloudinit_disk_size) }}"
+    _bridge: "{{ template.bridge | default(cloudinit_bridge) }}"
+    _tags: "{{ template.tags | join(',') }}"
+    _vendor_data: "{{ template.vendor_data }}"
+    _snippet_name: "{{ template.name | regex_replace('[^a-zA-Z0-9-]', '-') }}.yaml"
+
+- name: Check if template already exists
+  ansible.builtin.command: qm status {{ _vmid }}
+  register: _template_exists
+  failed_when: false
+  changed_when: false
+
+- name: Skip message for existing template
+  ansible.builtin.debug:
+    msg: "Template {{ _name }} (VMID {{ _vmid }}) already exists, skipping"
+  when: _template_exists.rc == 0
+
+- name: Create template
+  when: _template_exists.rc != 0
+  block:
+    - name: Ensure template directories exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - "{{ _storage_path }}/template/iso"
+        - "{{ _storage_path }}/snippets"
+
+    - name: Get expected checksum from remote
+      ansible.builtin.uri:
+        url: "{{ _checksum_url }}"
+        return_content: true
+      register: checksum_content
+
+    - name: Parse expected checksum
+      ansible.builtin.set_fact:
+        _expected_checksum: "{{ checksum_content.content | regex_search('([a-f0-9]{64})\\s+\\*?' + _image_filename, '\\1') | first }}"
+
+    - name: Download cloud image
+      ansible.builtin.get_url:
+        url: "{{ _image_url }}"
+        dest: "{{ _storage_path }}/template/iso/{{ _image_filename }}"
+        checksum: "sha256:{{ _expected_checksum }}"
+        mode: '0644'
+
+    - name: Remove old resized image if exists
+      ansible.builtin.file:
+        path: "{{ _storage_path }}/template/iso/{{ _image_filename | splitext | first }}-resized.img"
+        state: absent
+
+    - name: Copy image for resizing
+      ansible.builtin.copy:
+        src: "{{ _storage_path }}/template/iso/{{ _image_filename }}"
+        dest: "{{ _storage_path }}/template/iso/{{ _image_filename | splitext | first }}-resized.img"
+        remote_src: true
+        mode: '0644'
+
+    - name: Resize cloud image
+      ansible.builtin.command: >
+        qemu-img resize
+        {{ _storage_path }}/template/iso/{{ _image_filename | splitext | first }}-resized.img
+        {{ _disk_size }}
+      changed_when: true
+
+    - name: Create VM
+      ansible.builtin.command: >
+        qm create {{ _vmid }}
+        --name "{{ _name }}"
+        --ostype l26
+        --memory {{ _memory }}
+        --balloon 0
+        --agent 1
+        --bios ovmf
+        --machine q35
+        --efidisk0 {{ _storage }}:0,pre-enrolled-keys=0
+        --cpu host
+        --socket {{ _sockets }}
+        --cores {{ _cores }}
+        --vga serial0
+        --serial0 socket
+        --net0 virtio,bridge={{ _bridge }}
+      changed_when: true
+
+    - name: Import disk to VM
+      ansible.builtin.command: >
+        qm importdisk {{ _vmid }}
+        {{ _storage_path }}/template/iso/{{ _image_filename | splitext | first }}-resized.img
+        {{ _storage }}
+      changed_when: true
+
+    - name: Configure SCSI controller and disk
+      ansible.builtin.command: >
+        qm set {{ _vmid }}
+        --scsihw virtio-scsi-pci
+        --scsi0 {{ _storage }}:{{ _vmid }}/vm-{{ _vmid }}-disk-1.raw,discard=on
+      changed_when: true
+
+    - name: Set boot order
+      ansible.builtin.command: qm set {{ _vmid }} --boot order=scsi0
+      changed_when: true
+
+    - name: Add cloud-init drive
+      ansible.builtin.command: qm set {{ _vmid }} --scsi1 {{ _storage }}:cloudinit
+      changed_when: true
+
+    - name: Create cloud-init vendor snippet
+      ansible.builtin.copy:
+        content: "{{ _vendor_data }}"
+        dest: "{{ _storage_path }}/snippets/{{ _snippet_name }}"
+        mode: '0644'
+
+    - name: Configure cloud-init custom vendor data
+      ansible.builtin.command: qm set {{ _vmid }} --cicustom "vendor={{ _storage }}:snippets/{{ _snippet_name }}"
+      changed_when: true
+
+    - name: Set VM tags
+      ansible.builtin.command: qm set {{ _vmid }} --tags {{ _tags }}
+      changed_when: true
+
+    - name: Set cloud-init user
+      ansible.builtin.command: qm set {{ _vmid }} --ciuser {{ cloudinit_user }}
+      changed_when: true
+
+    - name: Set cloud-init SSH keys
+      ansible.builtin.command: qm set {{ _vmid }} --sshkeys {{ cloudinit_ssh_keys_file }}
+      changed_when: true
+
+    - name: Set cloud-init IP config
+      ansible.builtin.command: qm set {{ _vmid }} --ipconfig0 ip=dhcp,ip6=dhcp
+      changed_when: true
+
+    - name: Convert VM to template
+      ansible.builtin.command: qm template {{ _vmid }}
+      changed_when: true

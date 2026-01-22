@@ -1,0 +1,39 @@
+---
+# Defaults for the proxmox_cloudinit_template role: build Proxmox VM templates
+# from Ubuntu cloud images. Per-template values in `cloudinit_templates` override
+# the matching default below.
+
+# Default storage settings
+cloudinit_storage: "vms"
+cloudinit_storage_path: "/mnt/zpool_nvme"
+
+# Default VM settings
+cloudinit_memory: 1024
+cloudinit_cores: 1
+cloudinit_sockets: 1
+cloudinit_disk_size: "8G"
+cloudinit_bridge: "vmbr0"
+
+# Default cloud-init user settings
+cloudinit_user: "{{ ansible_user }}"
+cloudinit_ssh_keys_file: "~/.ssh/authorized_keys"
+
+# List of templates to create
+# Example:
+# cloudinit_templates:
+#   - vmid: 8200
+#     name: "ubuntu-noble-template"
+#     image_url: "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img"
+#     checksum_url: "https://cloud-images.ubuntu.com/noble/current/SHA256SUMS"
+#     tags:
+#       - ubuntu-template
+#       - noble
+#       - cloudinit
+#     vendor_data: |
+#       #cloud-config
+#       runcmd:
+#         - apt-get update
+#         - apt-get install -y qemu-guest-agent
+#         - systemctl enable ssh
+#         - reboot
+cloudinit_templates: []
