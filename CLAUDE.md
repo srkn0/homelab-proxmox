@@ -4,64 +4,60 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a homelab infrastructure repository for setting up and managing a Proxmox VE hypervisor with ZFS storage, GPU passthrough, and VM templates.
+Ansible-based infrastructure-as-code for deploying Proxmox VE virtualization on bare metal homelab systems. The project handles the full stack from OS installation to cloud-init VM templates.
 
-## Repository Structure
+## Commands
 
-- **ansible/** - Ansible playbooks for Proxmox and ZFS setup
-- **debian-preseed/** - Automated Debian installer ISO builder using preseed
-- **ubuntu-cloud-init/** - Scripts to create Ubuntu cloud-init VM templates on Proxmox
-
-## Common Commands
-
-### Ansible (run from `ansible/` directory)
-
+### Install Ansible Role Dependencies
 ```bash
-# Install Ansible dependencies (required before running playbooks)
+cd ansible
 ansible-galaxy install -r requirements.yml -p ./roles
+```
 
-# Setup ZFS pools
+### Run Playbooks (execute in order)
+```bash
+cd ansible
 ansible-playbook -i inventories/homelab.ini playbooks/setup_zfs.yml
-
-# Install/configure Proxmox
 ansible-playbook -i inventories/homelab.ini playbooks/install_proxmox.yml
+ansible-playbook -i inventories/homelab.ini playbooks/setup_cloudinit_templates.yml
 ```
 
-### Debian Preseed ISO
-
+### Build Custom Debian Preseed ISO
 ```bash
-# Prerequisites on Debian host
-apt-get install -y --no-install-recommends xorriso isolinux pwgen
-
-# Build preseeded ISO
-./build /path/to/debian-netinst.iso /path/to/output-preseed.iso
+cd debian-preseed
+./build /path/to/debian-13.x.x-amd64-netinst.iso /path/to/output.iso
+# Requires: xorriso, isolinux, pwgen
 ```
 
-### Ubuntu Cloud-Init Templates (run on Proxmox host)
+## Architecture
 
-```bash
-# Create base Ubuntu Noble template (VM ID 8200)
-VMID=8200 STORAGE=vms ./ubuntu-noble-cloudinit.sh
+```
+ansible/
+├── ansible.cfg                    # Sets roles_path to ./roles
+├── requirements.yml               # External roles: lae.proxmox, mrlesmithjr.zfs
+├── inventories/homelab.ini        # Single host: 192.168.178.90 (root)
+├── playbooks/
+│   ├── setup_zfs.yml              # ZFS pool creation (3 pools: k8s, nvme, backup)
+│   ├── install_proxmox.yml        # Proxmox installation with GPU passthrough
+│   └── setup_cloudinit_templates.yml  # Ubuntu cloud-init template creation
+└── roles/
+    └── proxmox_cloudinit_template/    # Custom role for VM templates
 
-# Create Ubuntu Noble template with NVIDIA drivers (VM ID 8202)
-VMID=8202 STORAGE=vms ./ubuntu-noble-cloudinit+nvidia+runtime.sh
+debian-preseed/
+├── build                          # ISO repack script
+├── preseed.cfg                    # Automated Debian installer config
+└── postinstall.d/                 # Post-install scripts (SSH keys, configs)
 ```
 
-## Architecture Notes
+## Key Conventions
 
-### Ansible Roles
-- Uses `lae.proxmox` (v1.10.0) for Proxmox configuration including storage, users, ACLs, and GPU passthrough
-- Uses `mrlesmithjr.zfs` (v0.1.2) for ZFS pool creation
+- **Variable prefixes**: `pve_` for lae.proxmox role, `cloudinit_` for custom role
+- **Pool naming**: `zpool_*` (k8s, nvme, backup)
+- **VM template IDs**: 8200+ range to avoid conflicts with regular VMs
+- **Device identifiers**: Use persistent naming (ata-*, nvme-*) in ZFS configs
+- **Tags**: kebab-case (e.g., ubuntu-template, cloudinit, nvidia)
 
-### Storage Layout
-The setup configures three ZFS pools:
-- `zpool_k8s` - Striped mirror for Kubernetes workloads (4x Samsung SSDs)
-- `zpool_nvme` - Single NVMe for VM images and ISOs
-- `zpool_backup` - Single HDD for backups
+## External Role Documentation
 
-### VM Templates
-Cloud-init templates are created with:
-- UEFI boot (OVMF)
-- virtio-scsi storage controller
-- QEMU guest agent
-- SSH enabled with current user's authorized_keys
+- lae.proxmox: https://github.com/lae/ansible-role-proxmox
+- mrlesmithjr.zfs: https://github.com/mrlesmithjr/ansible-zfs
