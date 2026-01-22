@@ -1,0 +1,137 @@
+---
+- name: Set template variables
+  set_fact:
+    _vmid: "{{ template.vmid }}"
+    _name: "{{ template.name }}"
+    _image_url: "{{ template.image_url }}"
+    _image_filename: "{{ template.image_url | basename }}"
+    _checksum_url: "{{ template.checksum_url }}"
+    _storage: "{{ template.storage | default(cloudinit_storage) }}"
+    _storage_path: "{{ template.storage_path | default(cloudinit_storage_path) }}"
+    _memory: "{{ template.memory | default(cloudinit_memory) }}"
+    _cores: "{{ template.cores | default(cloudinit_cores) }}"
+    _sockets: "{{ template.sockets | default(cloudinit_sockets) }}"
+    _disk_size: "{{ template.disk_size | default(cloudinit_disk_size) }}"
+    _bridge: "{{ template.bridge | default(cloudinit_bridge) }}"
+    _tags: "{{ template.tags | join(',') }}"
+    _vendor_data: "{{ template.vendor_data }}"
+    _snippet_name: "{{ template.name | regex_replace('[^a-zA-Z0-9-]', '-') }}.yaml"
+
+- name: Check if template already exists
+  command: qm status {{ _vmid }}
+  register: _template_exists
+  failed_when: false
+  changed_when: false
+
+- name: Skip message for existing template
+  debug:
+    msg: "Template {{ _name }} (VMID {{ _vmid }}) already exists, skipping"
+  when: _template_exists.rc == 0
+
+- name: Create template
+  when: _template_exists.rc != 0
+  block:
+    - name: Ensure template directories exist
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - "{{ _storage_path }}/template/iso"
+        - "{{ _storage_path }}/snippets"
+
+    - name: Get expected checksum from remote
+      uri:
+        url: "{{ _checksum_url }}"
+        return_content: yes
+      register: checksum_content
+
+    - name: Parse expected checksum
+      set_fact:
+        _expected_checksum: "{{ checksum_content.content | regex_search('([a-f0-9]{64})\\s+\\*?' + _image_filename, '\\1') | first }}"
+
+    - name: Download cloud image
+      get_url:
+        url: "{{ _image_url }}"
+        dest: "{{ _storage_path }}/template/iso/{{ _image_filename }}"
+        checksum: "sha256:{{ _expected_checksum }}"
+        mode: '0644'
+
+    - name: Remove old resized image if exists
+      file:
+        path: "{{ _storage_path }}/template/iso/{{ _image_filename | splitext | first }}-resized.img"
+        state: absent
+
+    - name: Copy image for resizing
+      copy:
+        src: "{{ _storage_path }}/template/iso/{{ _image_filename }}"
+        dest: "{{ _storage_path }}/template/iso/{{ _image_filename | splitext | first }}-resized.img"
+        remote_src: yes
+        mode: '0644'
+
+    - name: Resize cloud image
+      command: >
+        qemu-img resize
+        {{ _storage_path }}/template/iso/{{ _image_filename | splitext | first }}-resized.img
+        {{ _disk_size }}
+      changed_when: true
+
+    - name: Create VM
+      command: >
+        qm create {{ _vmid }}
+        --name "{{ _name }}"
+        --ostype l26
+        --memory {{ _memory }}
+        --balloon 0
+        --agent 1
+        --bios ovmf
+        --machine q35
+        --efidisk0 {{ _storage }}:0,pre-enrolled-keys=0
+        --cpu host
+        --socket {{ _sockets }}
+        --cores {{ _cores }}
+        --vga serial0
+        --serial0 socket
+        --net0 virtio,bridge={{ _bridge }}
+
+    - name: Import disk to VM
+      command: >
+        qm importdisk {{ _vmid }}
+        {{ _storage_path }}/template/iso/{{ _image_filename | splitext | first }}-resized.img
+        {{ _storage }}
+
+    - name: Configure SCSI controller and disk
+      command: >
+        qm set {{ _vmid }}
+        --scsihw virtio-scsi-pci
+        --scsi0 {{ _storage }}:{{ _vmid }}/vm-{{ _vmid }}-disk-1.raw,discard=on
+
+    - name: Set boot order
+      command: qm set {{ _vmid }} --boot order=scsi0
+
+    - name: Add cloud-init drive
+      command: qm set {{ _vmid }} --scsi1 {{ _storage }}:cloudinit
+
+    - name: Create cloud-init vendor snippet
+      copy:
+        content: "{{ _vendor_data }}"
+        dest: "{{ _storage_path }}/snippets/{{ _snippet_name }}"
+        mode: '0644'
+
+    - name: Configure cloud-init custom vendor data
+      command: qm set {{ _vmid }} --cicustom "vendor={{ _storage }}:snippets/{{ _snippet_name }}"
+
+    - name: Set VM tags
+      command: qm set {{ _vmid }} --tags {{ _tags }}
+
+    - name: Set cloud-init user
+      command: qm set {{ _vmid }} --ciuser {{ cloudinit_user }}
+
+    - name: Set cloud-init SSH keys
+      command: qm set {{ _vmid }} --sshkeys {{ cloudinit_ssh_keys_file }}
+
+    - name: Set cloud-init IP config
+      command: qm set {{ _vmid }} --ipconfig0 ip=dhcp,ip6=dhcp
+
+    - name: Convert VM to template
+      command: qm template {{ _vmid }}

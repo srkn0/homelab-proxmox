@@ -1,0 +1,6 @@
+---
+- name: Create cloud-init VM templates
+  include_tasks: create_template.yml
+  loop: "{{ cloudinit_templates }}"
+  loop_control:
+    loop_var: template
