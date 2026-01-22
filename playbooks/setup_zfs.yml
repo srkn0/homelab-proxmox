@@ -1,0 +1,67 @@
+---
+- name: Configure ZFS pools on the Proxmox host
+  hosts: all
+  become: true
+  roles:
+    - role: mrlesmithjr.zfs
+      vars:
+        # set to false after initial setup; afterwards zfs is managed via proxmox updates
+        zfs_install_update: false
+
+        # create the pools
+        zfs_create_pools: true
+
+        # do not create any filesystems / volumes
+        zfs_create_filesystems: false
+        zfs_create_volumes: false
+
+        # pool overview
+        zfs_pools:
+          # k8s pool with 2 mirror vdevs (striped mirror)
+          - name: zpool_k8s
+            action: create
+            type: mirror
+            devices:
+              - "ata-Samsung_SSD_860_EVO_500GB_S4XBNF0NA06663B"
+              - "ata-Samsung_SSD_860_EVO_500GB_S4XBNF0NA07832N"
+            compression: lz4
+            recordsize: 16k
+            atime: "off"
+            xattr: sa
+            mountpoint: /mnt/zpool_k8s
+            state: present
+
+          - name: zpool_k8s
+            action: add
+            type: mirror
+            devices:
+              - "ata-Samsung_SSD_870_EVO_500GB_S6PYNL0XB10079K"
+              - "ata-Samsung_SSD_870_EVO_500GB_S6PYNL0XB10080A"
+            state: present
+
+          # NVMe Pool (single device)
+          - name: zpool_nvme
+            action: create
+            type: basic
+            devices:
+              - "nvme-SSD_M.2_PCIe3_1TB_InnovationIT_704822210300255"
+            compression: lz4
+            recordsize: 16k
+            atime: "off"
+            mountpoint: /mnt/zpool_nvme
+            state: present
+
+          # Backup Pool (single HDD)
+          - name: zpool_backup
+            action: create
+            type: basic
+            devices:
+              - "ata-ST2000DM001-1ER164_W4Z2B3JZ"
+            compression: lz4
+            recordsize: 128k
+            atime: "off"
+            mountpoint: /mnt/zpool_backup
+            state: present
+
+        # optional: performance tuning (keep or adjust as needed)
+        zfs_enable_performance_tuning: true
