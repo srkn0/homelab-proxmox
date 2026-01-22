@@ -1,0 +1,48 @@
+---
+version: '3'
+
+set: [pipefail]
+shopt: [globstar]
+
+env:
+  KUBESPRAY_VERSION: v2.29.1 # change before running upgrades
+
+tasks:
+  default: task --list
+
+  bootstrap-k8s-cluster:
+    desc: Bootstrap a k8s cluster using kubespray inside a docker container
+    cmds:
+      - |
+        set -eu
+        set -- {{.CLI_ARGS}}
+        CLUSTER="${1:-}"
+        if [ -z "$CLUSTER" ]; then
+          echo "Usage: task bootstrap-k8s-cluster -- <cluster>"
+          exit 1
+        fi
+
+        docker run --rm -it --mount type=bind,source="$(pwd)"/inventory/kubespray/$CLUSTER,dst=/inventory \
+          --mount type=bind,source="${HOME}"/.ssh/id_ed25519,dst=/root/.ssh/id_ed25519 \
+          quay.io/kubespray/kubespray:$KUBESPRAY_VERSION ansible-playbook -i /inventory/inventory.ini --private-key /root/.ssh/id_ed25519 cluster.yml
+    preconditions:
+      - which docker
+
+  upgrade-k8s-cluster:
+    desc: upgrade a k8s cluster using kubespray inside a docker container
+    cmds:
+      - |
+        set -eu
+        set -- {{.CLI_ARGS}}
+        CLUSTER="${1:-}"
+        KUBE_VERSION="${2:-}"
+        if [ -z "$CLUSTER" ]; then
+          echo "Usage: task upgrade-k8s-cluster -- <cluster> <kube_version>"
+          exit 1
+        fi
+
+        docker run --rm -it --mount type=bind,source="$(pwd)"/inventory/kubespray/$CLUSTER,dst=/inventory \
+          --mount type=bind,source="${HOME}"/.ssh/id_ed25519,dst=/root/.ssh/id_ed25519 \
+          quay.io/kubespray/kubespray:$KUBESPRAY_VERSION ansible-playbook upgrade-cluster.yml -b -i /inventory/inventory.ini --private-key /root/.ssh/id_ed25519 -e "kube_version=$KUBE_VERSION" 
+    preconditions:
+      - which docker
