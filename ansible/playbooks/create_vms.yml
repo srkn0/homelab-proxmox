@@ -5,15 +5,15 @@
     - role: proxmox_vm
       vars:
         vm_template_vmid: 8201  # kubernetes-ready template
-        vm_nameserver: "192.168.178.1"
+        vm_nameserver: "1.1.1.1"
         vm_gateway: "192.168.178.1"
         vm_user: "root"
 
         proxmox_vms:
           - vmid: 9001
-            name: "k8s-master-01"
-            memory: 4096
-            cores: 4
+            name: "k8s-home-01"
+            memory: 16384
+            cores: 6
             disk_size: "50G"
             ip: "192.168.178.215"
             cidr: 24

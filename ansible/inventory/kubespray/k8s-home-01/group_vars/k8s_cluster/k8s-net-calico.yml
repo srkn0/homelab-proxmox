@@ -33,7 +33,7 @@ calico_pool_blocksize: 26
 
 # If doing peering with node-assigned asn where the globas does not match your nodes, you want this
 # to be true.  All other cases, false.
-# calico_no_global_as_num: false
+# calico_no_global_as_num: falsew
 
 # You can set MTU value here. If left undefined or empty, it will
 # not be specified in calico CNI config, so Calico will use built-in

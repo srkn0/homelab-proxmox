@@ -3,8 +3,8 @@
   roles:
     - role: mrlesmithjr.zfs
       vars:
-        zfs_install_update: true
-
+        zfs_install_update: false # set to false after initial setup, afterwards zfs is managed via proxmox updates
+    
         # Pools erstellen
         zfs_create_pools: true
 

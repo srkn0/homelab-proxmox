@@ -27,8 +27,9 @@
           type: dir
           path: /mnt/zpool_nvme
           content: [ "images", "rootdir", "vztmpl", "iso", "snippets" ]
-        # pve_zfs_options: "zfs_arc_max=17179869184"  # for ex. 16GB ARC limit # consider setting this later
-        
+        pve_zfs_options: "zfs_arc_max=8589934592 zfs_arc_meta_limit=1073741824 zfs_arc_min=536870912 zfs_prefetch_disable=1 zfs_txg_timeout=5"
+   
+
         # ------------------------
         # gpu passthrough 
         pve_pcie_passthrough_enabled: true # Set this to true to enable PCIe passthrough.
