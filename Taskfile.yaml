@@ -46,3 +46,27 @@ tasks:
           quay.io/kubespray/kubespray:$KUBESPRAY_VERSION ansible-playbook upgrade-cluster.yml -b -i /inventory/inventory.ini --private-key /root/.ssh/id_ed25519 -e "kube_version=$KUBE_VERSION" 
     preconditions:
       - which docker
+
+  get-kubeconfig:
+    desc: get kubeconfig from the first control plane node
+    cmds:
+      - |
+        set -eu
+        set -- {{.CLI_ARGS}}
+        CLUSTER="${1:-}"
+        if [ -z "$CLUSTER" ]; then
+          echo "Usage: task get-kubeconfig -- <cluster>"
+          exit 1
+        fi
+        IP=$(grep '^c1 ' ./inventory/kubespray/$CLUSTER/inventory.ini | grep -oP 'ansible_host=\K[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
+        ssh root@$IP "cat /etc/kubernetes/admin.conf" > ./inventory/kubespray/$CLUSTER/kubeconfig.tmp
+        
+        # IP und Clustername ersetzen
+        sed -e "s|https://127.0.0.1:6443|https://$IP:6443|g" \
+            -e "s|cluster.local|$CLUSTER|g" \
+            ./inventory/kubespray/$CLUSTER/kubeconfig.tmp > ./inventory/kubespray/$CLUSTER/kubeconfig
+
+        rm -f ./inventory/kubespray/$CLUSTER/kubeconfig.tmp
+
+    preconditions:
+      - which ssh
