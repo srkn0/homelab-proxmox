@@ -27,8 +27,12 @@
           type: dir
           path: /mnt/zpool_nvme
           content: [ "images", "rootdir", "vztmpl", "iso", "snippets" ]
-        pve_zfs_options: "zfs_arc_max=8589934592 zfs_arc_meta_limit=1073741824 zfs_arc_min=536870912 zfs_prefetch_disable=1 zfs_txg_timeout=5"
-   
+        # arc_max: 16GiB
+        # arc_min: 1GiB
+        # arc_meta_limit: 2GiB
+        # byte -> gibibyte
+        pve_zfs_options: "zfs_arc_max=17179869184 zfs_arc_meta_limit=2147483648 zfs_arc_min=1073741824 zfs_prefetch_disable=1 zfs_txg_timeout=5"
+
 
         # ------------------------
         # gpu passthrough 
