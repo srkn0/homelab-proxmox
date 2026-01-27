@@ -61,3 +61,9 @@ I just have one node at the moment and probably wont need more than that
 - make sure to read docs for that specific version https://github.com/kubernetes-sigs/kubespray, `$KUBE_VERSION` needs to be supported by the used kubespray docker image version
 
 **command**: `task upgrade-k8s-cluster -- $CLUSTER $KUBE_VERSION`
+
+---
+
+## node tweaks
+- `apt install powertop -y && powertop --auto-tine`
+- `echo powersave | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
