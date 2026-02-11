@@ -47,7 +47,8 @@ I just have one node at the moment and probably wont need more than that
 **command**: `ansible-playbook -i inventory/proxmox/inventory.ini playbooks/setup_cloudinit_templates.yml`
 
 ### create proxmox vms
-**command**: `ansible-playbook -i inventory/proxmox/inventory.ini playbooks/create_vms.yml`
+**command**: `ansible-playbook -i inventory/proxmox/inventory.ini playbooks/create_vms_8201.yml`
+**command**: `ansible-playbook -i inventory/proxmox/inventory.ini playbooks/create_vms_8202.yml`
 
 ### bootstrap k8s cluster via kubespray
 - `$CLUSTER` should be the folder name of the kubespray inventory residing at `$(pwd)/inventory/kubespray/$CLUSTER`

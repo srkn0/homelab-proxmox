@@ -153,11 +153,13 @@
                   fi
 
                 # nodejs + pnpm
-                - curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
-                - apt-get install -y nodejs
-                - corepack enable
-                - corepack prepare pnpm@latest --activate
-
+                - |
+                  export HOME=/root
+                  curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
+                  apt-get install -y nodejs
+                  corepack enable
+                  corepack prepare pnpm@latest --activate
+                  
                 # openclaw
                 - curl -fsSL --proto '=https' --tlsv1.2 https://openclaw.ai/install.sh | bash -s -- --no-onboard
 
