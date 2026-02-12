@@ -20,3 +20,13 @@
             tags:
               - kubernetes
               - master
+          - vmid: 9002
+            name: "k8s-dev"
+            memory: 8192
+            cores: 4
+            disk_size: "50G"
+            ip: "192.168.178.217"
+            cidr: 24
+            tags:
+              - kubernetes
+              - master
