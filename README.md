@@ -25,6 +25,9 @@ and Kubespray turns the resulting VMs into clusters.
   a `Taskfile`.
 - **Quality automation**: `yamllint` + `ansible-lint` (production profile) enforced in
   CI and via pre-commit.
+- **Dependency automation**: Renovate keeps roles, actions and the Kubespray version
+  current; a custom workflow merges the upstream Kubespray sample `group_vars` into each
+  bump PR and posts the release notes, so upgrades are reviewable in one place.
 
 ## Architecture
 
@@ -72,6 +75,9 @@ flowchart TD
 ├── inventory/
 │   ├── proxmox/                     # the Proxmox host
 │   └── kubespray/                   # per-cluster Kubespray inventories
+├── scripts/                         # kubespray sample merge + release-notes helpers
+├── .github/workflows/               # CI linting + kubespray group_vars auto-merge
+├── .renovaterc.json5                # Renovate dependency updates
 ├── Taskfile.yaml                    # Kubespray bootstrap/upgrade/kubeconfig tasks
 ├── requirements.yml                 # pinned external role versions
 └── ansible.cfg
@@ -187,6 +193,25 @@ sudo sysctl -p /etc/sysctl.d/99-tailscale.conf
 # advertise the Traefik / MetalLB load-balancer IP
 sudo tailscale set --advertise-routes=192.168.178.201/32
 ```
+
+## Dependency automation
+
+[Renovate](https://docs.renovatebot.com) (config in `.renovaterc.json5`) keeps the
+moving parts current: the external Ansible roles in `requirements.yml`, the GitHub
+Actions, the pre-commit hooks, and the Kubespray version pinned in `Taskfile.yaml`
+(mapped to the `quay.io/kubespray/kubespray` image via a custom manager).
+
+Kubespray upgrades get special treatment. The per-cluster `group_vars` are customized
+copies of kubespray's upstream sample, whose defaults drift between releases. When
+Renovate opens a Kubespray bump PR, `.github/workflows/kubespray-sample-merge.yml`:
+
+- 3-way merges the upstream sample delta (old version to new version) into the
+  customized `group_vars`, so only the upstream changes surface, with conflict markers
+  where a customization overlaps; and
+- posts a single PR comment with the kubespray release notes for every version in
+  between, newest first.
+
+Reconciling the result stays a manual review step.
 
 ## License
 

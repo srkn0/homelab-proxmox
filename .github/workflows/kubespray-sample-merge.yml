@@ -1,0 +1,80 @@
+---
+name: Kubespray sample merge
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - Taskfile.yaml
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: kubespray-sample-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  merge:
+    name: Merge kubespray sample group_vars
+    runs-on: ubuntu-latest
+    # Only react to Renovate's Kubespray bump PRs.
+    if: github.event.pull_request.user.login == 'renovate[bot]'
+    steps:
+      - name: Check out PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Determine old and new Kubespray versions
+        id: versions
+        run: |
+          set -euo pipefail
+          git fetch --quiet origin "${{ github.base_ref }}"
+          read_version() { grep -oE 'KUBESPRAY_VERSION:[[:space:]]*\S+' | awk '{print $2}' | head -n1; }
+          new="$(read_version < Taskfile.yaml)"
+          old="$(git show "origin/${{ github.base_ref }}:Taskfile.yaml" | read_version)"
+          echo "old=$old" >> "$GITHUB_OUTPUT"
+          echo "new=$new" >> "$GITHUB_OUTPUT"
+          echo "old=$old new=$new"
+
+      - name: Merge sample group_vars
+        if: steps.versions.outputs.old != steps.versions.outputs.new
+        run: scripts/merge-kubespray-sample.sh "${{ steps.versions.outputs.old }}" "${{ steps.versions.outputs.new }}"
+
+      - name: Commit and push if changed
+        if: steps.versions.outputs.old != steps.versions.outputs.new
+        run: |
+          set -euo pipefail
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "No group_vars changes."
+            exit 0
+          fi
+          conflicts="$({ grep -rhoE '^<<<<<<< ' inventory/kubespray 2>/dev/null || true; } | wc -l | tr -d ' ')"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add inventory/kubespray
+          git commit -m "chore(deps): merge kubespray ${{ steps.versions.outputs.new }} sample into group_vars (${conflicts} conflicts)"
+          git push origin "HEAD:${{ github.head_ref }}"
+
+      - name: Post release notes comment
+        if: steps.versions.outputs.old != steps.versions.outputs.new
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          scripts/kubespray-release-notes.sh \
+            "${{ steps.versions.outputs.old }}" "${{ steps.versions.outputs.new }}" > /tmp/ksp-notes.md
+          repo="${{ github.repository }}"
+          pr="${{ github.event.pull_request.number }}"
+          id="$(gh api "repos/$repo/issues/$pr/comments" --paginate \
+                  --jq '.[] | select(.body | contains("<!-- ksp-release-notes -->")) | .id' | head -n1)"
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$repo/issues/comments/$id" -F body=@/tmp/ksp-notes.md >/dev/null
+            echo "updated comment $id"
+          else
+            gh api -X POST "repos/$repo/issues/$pr/comments" -F body=@/tmp/ksp-notes.md >/dev/null
+            echo "created comment"
+          fi
