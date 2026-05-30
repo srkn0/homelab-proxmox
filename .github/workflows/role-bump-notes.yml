@@ -1,0 +1,89 @@
+---
+name: Ansible role bump notes
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - requirements.yml
+
+permissions:
+  pull-requests: write
+
+concurrency:
+  group: role-bump-notes-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  notes:
+    name: Comment role default changes
+    runs-on: ubuntu-latest
+    # Only react to Renovate's role bump PRs.
+    if: github.event.pull_request.user.login == 'renovate[bot]'
+    steps:
+      - name: Check out PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Build role bump comment
+        id: build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git fetch --quiet origin "${{ github.base_ref }}"
+          head_req="$(cat requirements.yml)"
+          base_req="$(git show "origin/${{ github.base_ref }}:requirements.yml")"
+          get_ver() {
+            awk -v role="$1" '
+              $2=="src:" && $3==role {f=1; next}
+              f && $1=="version:" {v=$2; gsub(/["'"'"']/,"",v); print v; exit}'
+          }
+
+          out="$(mktemp)"
+          printf '<!-- role-bump-notes -->\n\n# Ansible role updates\n\n' >"$out"
+          any=0
+
+          # role_name|owner/repo|vars_file|var_prefix
+          roles=(
+            "lae.proxmox|lae/ansible-role-proxmox|playbooks/install_proxmox.yml|pve_"
+            "mrlesmithjr.zfs|mrlesmithjr/ansible-zfs|playbooks/setup_zfs.yml|zfs_"
+          )
+          for entry in "${roles[@]}"; do
+            IFS='|' read -r name repo vars prefix <<<"$entry"
+            old="$(printf '%s' "$base_req" | get_ver "$name")"
+            new="$(printf '%s' "$head_req" | get_ver "$name")"
+            [ -n "$new" ] || continue
+            [ "$old" != "$new" ] || continue
+            echo "changed: $name $old -> $new"
+            scripts/role-bump-comment.sh "$name" "$repo" "$old" "$new" "$vars" "$prefix" >>"$out"
+            any=1
+          done
+
+          if [ "$any" -eq 0 ]; then
+            echo "no tracked role version changed"
+            echo "changed=0" >>"$GITHUB_OUTPUT"
+            exit 0
+          fi
+          cp "$out" /tmp/role-comment.md
+          echo "changed=1" >>"$GITHUB_OUTPUT"
+
+      - name: Upsert PR comment
+        if: steps.build.outputs.changed == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          repo="${{ github.repository }}"
+          pr="${{ github.event.pull_request.number }}"
+          id="$(gh api "repos/$repo/issues/$pr/comments" --paginate \
+                  --jq '.[] | select(.body | contains("<!-- role-bump-notes -->")) | .id' | head -n1)"
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$repo/issues/comments/$id" -F body=@/tmp/role-comment.md >/dev/null
+            echo "updated comment $id"
+          else
+            gh api -X POST "repos/$repo/issues/$pr/comments" -F body=@/tmp/role-comment.md >/dev/null
+            echo "created comment"
+          fi

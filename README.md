@@ -75,8 +75,8 @@ flowchart TD
 ├── inventory/
 │   ├── proxmox/                     # the Proxmox host
 │   └── kubespray/                   # per-cluster Kubespray inventories
-├── scripts/                         # kubespray sample merge + release-notes helpers
-├── .github/workflows/               # CI linting + kubespray group_vars auto-merge
+├── scripts/                         # dependency-bump helpers (kubespray + role diffs)
+├── .github/workflows/               # CI linting + dependency-bump automation
 ├── .renovaterc.json5                # Renovate dependency updates
 ├── Taskfile.yaml                    # Kubespray bootstrap/upgrade/kubeconfig tasks
 ├── requirements.yml                 # pinned external role versions
@@ -210,6 +210,11 @@ Renovate opens a Kubespray bump PR, `.github/workflows/kubespray-sample-merge.ym
   where a customization overlaps; and
 - posts a single PR comment with the kubespray release notes for every version in
   between, newest first.
+
+External role bumps (`lae.proxmox`, `mrlesmithjr.zfs`) get a comparable comment via
+`.github/workflows/role-bump-notes.yml`: it diffs the role's `defaults/main.yml`
+between versions and flags which of the variables you set are removed, renamed, or
+have a changed default.
 
 Reconciling the result stays a manual review step.
 
