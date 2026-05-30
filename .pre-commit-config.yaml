@@ -1,0 +1,13 @@
+---
+# Run `pre-commit install` once, then these hooks run on every commit.
+# See https://pre-commit.com
+repos:
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.38.0
+    hooks:
+      - id: yamllint
+
+  - repo: https://github.com/ansible/ansible-lint
+    rev: v25.9.2
+    hooks:
+      - id: ansible-lint

@@ -1,0 +1,19 @@
+---
+# Lint our own playbooks and custom roles only.
+exclude_paths:
+  - roles/lae.proxmox/
+  - roles/mrlesmithjr.zfs/
+  - inventory/kubespray/
+  - .github/
+  - .ansible/
+
+# Vendored external roles are pulled in via ansible-galaxy and not linted here.
+
+skip_list:
+  # Our variables use clean, consistent prefixes (vm_, cloudinit_, preseed_).
+  # The full-role-name prefix this rule wants would only add noise
+  # (e.g. proxmox_vm_vm_template_vmid).
+  - var-naming[no-role-prefix]
+  # A few unavoidably long lines: embedded shell commands, image URLs, and a
+  # checksum regex. yamllint still surfaces these as (non-fatal) warnings.
+  - yaml[line-length]
