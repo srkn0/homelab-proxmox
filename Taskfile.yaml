@@ -5,7 +5,7 @@ set: [pipefail]
 shopt: [globstar]
 
 env:
-  KUBESPRAY_VERSION: v2.29.1 # change before running upgrades
+  KUBESPRAY_VERSION: v2.31.0 # change before running upgrades
 
 tasks:
   default: task --list
