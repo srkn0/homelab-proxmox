@@ -2,4 +2,4 @@
 - src: lae.proxmox
   version: "v1.10.1"
 - src: mrlesmithjr.zfs
-  version: "v0.1.2"
+  version: "v0.1.3"
