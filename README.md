@@ -101,6 +101,17 @@ A single node (and probably all it will ever need):
 
 > The four Samsung SSDs live in a 5.25" hot-swap bay with a 4× 2.5" SATA backplane.
 
+## Public Readiness
+
+This repository intentionally keeps the real homelab topology visible: LAN IPs,
+hardware model names, disk layout, and a public SSH key are reference data, not
+secret material. Treat them as examples to override before reusing the playbooks.
+
+Kubespray's `kube_encrypt_secret_data` is currently disabled in the inventories.
+The cluster is private and secrets-at-rest encryption is not required for this
+lab, but enabling it should be part of the checklist before moving the pattern
+to a less isolated environment.
+
 ## Prerequisites
 
 - A control machine with Ansible and [`go-task`](https://taskfile.dev) (managed here

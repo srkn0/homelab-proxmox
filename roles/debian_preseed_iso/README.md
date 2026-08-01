@@ -42,7 +42,8 @@ parameterized and repeatable instead of a pile of hand-edited files.
 | `preseed_ntp_server` | `de.pool.ntp.org` | NTP pool (install + chrony). |
 | `preseed_install_interface` | `enp4s0` | Interface configured during install. |
 | `preseed_nameservers` | `1.1.1.1 1.0.0.1` | Installer DNS servers. |
-| `preseed_root_password` | `123` (reference only) | Root password; set a strong value or rely on SSH keys. |
+| `preseed_root_password_hash` | `!` | Root password hash. The default locks password login; set a hash from `mkpasswd` if you need password auth. |
+| `preseed_root_password` | `""` | Optional plaintext root password for short-lived lab installs only. Ignored when `preseed_root_password_hash` is set. |
 | `preseed_authorized_keys` | (a sample ed25519 key) | Public key(s) added to `/root/.ssh/authorized_keys`. |
 | `preseed_bridge_port` | `ens33` | Physical NIC enslaved to `vmbr0`. |
 | `preseed_bridge_address` | `192.168.178.90/24` | Static address for `vmbr0`. |
@@ -51,8 +52,8 @@ parameterized and repeatable instead of a pile of hand-edited files.
 | `preseed_bridge_nameservers` | `1.1.1.1 1.0.0.1` | DNS servers for the running host. |
 | `preseed_build_packages` | `[xorriso, isolinux, pwgen]` | Build-host packages. |
 
-> The default network/identity values are this homelab's reference values; override
-> them with `-e` or in your inventory for your own environment.
+> The default network, host, and SSH-key values are this homelab's reference
+> values. Override them with `-e` or in your inventory for your own environment.
 
 ## Usage
 

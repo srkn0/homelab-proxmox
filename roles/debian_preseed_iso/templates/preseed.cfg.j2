@@ -34,10 +34,17 @@ d-i mirror/http/proxy string
 # (stores password hashes in /etc/shadow instead of /etc/passwd for security)
 d-i passwd/shadow boolean true
 
-# enable root account and set static root password
+# enable root account; by default the password hash locks password login and
+# the host is reachable through the injected SSH keys.
 d-i passwd/root-login boolean true
+{% if preseed_root_password_hash | default("") | length > 0 %}
+d-i passwd/root-password-crypted password {{ preseed_root_password_hash }}
+{% elif preseed_root_password | default("") | length > 0 %}
 d-i passwd/root-password password {{ preseed_root_password }}
 d-i passwd/root-password-again password {{ preseed_root_password }}
+{% else %}
+d-i passwd/root-password-crypted password !
+{% endif %}
 
 # do not create an additional regular user account; keep only root
 d-i passwd/make-user boolean false

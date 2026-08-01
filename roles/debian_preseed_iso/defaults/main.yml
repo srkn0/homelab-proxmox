@@ -31,9 +31,11 @@ preseed_nameservers: "1.1.1.1 1.0.0.1"
 # =============================================================================
 # Root account
 # =============================================================================
-# NOTE: reference value only. For real builds set a strong password (or a
-# pre-hashed value via `mkpasswd`) or rely solely on the SSH keys below.
-preseed_root_password: "123"
+# By default the root password is locked and access relies on SSH keys.
+# Set preseed_root_password_hash to a mkpasswd-compatible hash for password
+# login, or set preseed_root_password only for short-lived lab installs.
+preseed_root_password: ""
+preseed_root_password_hash: "!"
 
 # Public SSH key(s) installed into /root/.ssh/authorized_keys on the target.
 preseed_authorized_keys: |
